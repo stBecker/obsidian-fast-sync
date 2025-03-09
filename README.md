@@ -1,0 +1,1 @@
+# obsidian-fast-sync
