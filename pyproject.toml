@@ -1,0 +1,14 @@
+[project]
+name = "obsidian-fast-sync"
+version = "0.1.0"
+description = "Python backend for the Obsidian fast-sync plugin"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115.11",
+    "httpx>=0.28.1",
+    "pytest>=8.3.5",
+    "pytest-asyncio",
+    "sqlalchemy>=2.0.38",
+    "uvicorn>=0.34.0",
+]

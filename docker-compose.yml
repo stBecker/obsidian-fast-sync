@@ -1,0 +1,19 @@
+version: '3'
+
+services:
+  backend:
+    build: .
+    ports:
+      - "32400:32400"
+    environment:
+      - API_KEY=${API_KEY:-hunter2}  # Use environment variable or default to "hunter2"
+      - DB_BASE_PATH=${DB_BASE_PATH:-/data}  # Make database base path configurable
+    volumes:
+      - ./data:/data  # Mount the data directory for persistent storage of SQLite databases
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:32400/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
