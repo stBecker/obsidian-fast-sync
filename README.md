@@ -33,6 +33,7 @@ The easiest way to set up the Fast Sync backend is using Docker Compose:
    ```
    API_KEY=your_secure_api_key
    DB_BASE_PATH=/data
+   SERVER_PORT=32400
    ```
 3. Start the backend server:
    ```bash
