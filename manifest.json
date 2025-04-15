@@ -1,7 +1,7 @@
 {
 	"id": "fast-sync",
 	"name": "Fast Sync",
-	"version": "1.0.2",
+	"version": "1.0.3",
 	"minAppVersion": "1.8.0",
 	"description": "Sync your vaults across multiple devices, with end-to-end encryption and version history.",
 	"author": "Stephan Becker",

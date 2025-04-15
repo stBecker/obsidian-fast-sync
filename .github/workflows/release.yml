@@ -19,7 +19,6 @@ jobs:
           node-version: "18.x"
 
       - name: Build plugin
-        working-directory: fast_sync_plugin
         run: |
           npm install
           npm run build
@@ -33,4 +32,4 @@ jobs:
           gh release create "$tag" \
             --title="$tag" \
             --draft \
-            fast_sync_plugin/main.js fast_sync_plugin/manifest.json fast_sync_plugin/styles.css
+            main.js manifest.json styles.css
