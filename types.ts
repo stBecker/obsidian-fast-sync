@@ -90,9 +90,11 @@ export interface FastSyncPluginSettings {
   enableVerboseLogging: boolean;
 }
 
+export type LogLevel = "info" | "error" | "debug" | "warn";
+
 export interface LogMessage {
   timestamp: number;
-  level: "info" | "error" | "debug";
+  level: LogLevel;
   message: string;
 }
 

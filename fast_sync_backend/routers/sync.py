@@ -7,10 +7,10 @@ from typing import List, Dict, Annotated
 from fastapi import APIRouter, Depends, HTTPException, Body, Path
 from starlette.status import HTTP_409_CONFLICT
 
-from fast_sync_backend import models
-from fast_sync_backend.caching import invalidate_state_cache, get_cached_state, set_cached_state
-from fast_sync_backend.database import get_db
-from fast_sync_backend.dependencies import get_api_key
+import models
+from caching import invalidate_state_cache, get_cached_state, set_cached_state
+from database import get_db
+from dependencies import get_api_key
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

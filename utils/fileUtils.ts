@@ -2,6 +2,7 @@ import { Vault } from "obsidian";
 
 import { VaultAdapter } from "../types";
 import { arrayBufferToBase64 } from "./encodingUtils";
+import { Logger } from "./logging";
 
 export function isImageFile(extension: string): boolean {
   return ["png", "jpg", "jpeg", "gif", "svg", "webp", "bmp", "ico"].includes(extension.toLowerCase());
@@ -29,7 +30,7 @@ export async function getFileMTime(adapter: VaultAdapter, filePath: string): Pro
     const stat = await adapter.stat(filePath);
     return stat ? stat.mtime : 0;
   } catch (e) {
-    console.warn(`Could not get mtime for ${filePath}:`, e);
+    Logger.warn(`Could not get mtime for ${filePath}:`, e);
     return 0;
   }
 }
@@ -77,7 +78,7 @@ export async function getPluginFiles(vault: Vault): Promise<string[]> {
         dirFiles.push(...subFiles);
       }
     } catch (error) {
-      console.warn(`Error accessing path ${path} during plugin scan:`, error);
+      Logger.warn(`Error accessing path ${path} during plugin scan:`, error);
     }
     return dirFiles;
   }
@@ -87,10 +88,10 @@ export async function getPluginFiles(vault: Vault): Promise<string[]> {
       const pluginFiles = await recursivelyGetFiles(vault.adapter, pluginDir);
       files.push(...pluginFiles);
     } else {
-      console.info("Plugin directory not found, skipping plugin file scan.");
+      Logger.info("Plugin directory not found, skipping plugin file scan.");
     }
   } catch (error) {
-    console.error("Error scanning for plugin files:", error);
+    Logger.error("Error scanning for plugin files:", error);
   }
 
   return files;
@@ -112,7 +113,7 @@ export async function cleanEmptyFolders(adapter: VaultAdapter, basePath: string 
       }
       return true;
     } catch (e) {
-      console.warn(`Error checking if folder is empty ${folder}:`, e);
+      Logger.warn(`Error checking if folder is empty ${folder}:`, e);
       return false;
     }
   };
@@ -122,10 +123,10 @@ export async function cleanEmptyFolders(adapter: VaultAdapter, basePath: string 
     if (await isEmpty(folder)) {
       try {
         await adapter.rmdir(folder, true);
-        console.info(`Deleted empty folder: ${folder}`);
+        Logger.info(`Deleted empty folder: ${folder}`);
       } catch (error) {
         if (!(error instanceof Error && error.message.includes("ENOENT"))) {
-          console.error(`Failed to delete folder ${folder}:`, error);
+          Logger.error(`Failed to delete folder ${folder}:`, error);
         }
       }
     }
@@ -143,13 +144,13 @@ export async function cleanEmptyFolders(adapter: VaultAdapter, basePath: string 
 
       await deleteIfEmpty(folder);
     } catch (e) {
-      console.warn(`Error processing folder ${folder} for cleanup:`, e);
+      Logger.warn(`Error processing folder ${folder} for cleanup:`, e);
     }
   };
 
-  console.info("Starting empty folder cleanup...");
+  Logger.info("Starting empty folder cleanup...");
   await processFolder(basePath);
-  console.info("Folder cleanup complete.");
+  Logger.info("Folder cleanup complete.");
 }
 
 /**
@@ -167,11 +168,11 @@ export async function ensureFoldersExist(adapter: VaultAdapter, filePath: string
 
     try {
       if (!(await adapter.exists(currentPath))) {
-        console.info("Creating folder:", currentPath);
+        Logger.info("Creating folder:", currentPath);
         await adapter.mkdir(currentPath);
       }
     } catch (error) {
-      console.error(`Failed to create folder ${currentPath}:`, error);
+      Logger.error(`Failed to create folder ${currentPath}:`, error);
 
       throw new Error(`Failed to ensure folder structure for ${filePath}`);
     }

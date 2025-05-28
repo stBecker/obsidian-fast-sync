@@ -1,7 +1,9 @@
 
 services:
   backend:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "${SERVER_PORT:-32400}:32400"
     environment:

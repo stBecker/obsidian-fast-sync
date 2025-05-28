@@ -1,6 +1,6 @@
-# Fast Sync: Real-time File Synchronization for Obsidian Vaults
+# FastSync: Real-time File Synchronization for Obsidian Vaults
 
-Fast Sync is a powerful plugin for Obsidian that enables seamless synchronization of your vaults across multiple devices with robust features like end-to-end encryption and version history.
+FastSync is a powerful plugin for Obsidian that enables seamless synchronization of your vaults across multiple devices with robust features like end-to-end encryption and version history.
 
 ## Features
 
@@ -26,7 +26,7 @@ Fast Sync is a powerful plugin for Obsidian that enables seamless synchronizatio
 
 ### Using Docker (Recommended)
 
-The easiest way to set up the Fast Sync backend is using Docker Compose:
+The easiest way to set up the FastSync backend is using Docker Compose:
 
 1. Clone or download the repository
 2. Create a `.env` file in the repository root with the following variables (optional):
@@ -76,7 +76,7 @@ If you prefer to run the backend without Docker:
 
 ## Database Structure
 
-Fast Sync uses SQLite databases for storing vault data:
+FastSync uses SQLite databases for storing vault data:
 
 - **vault_files**: Stores the logical state of files (current paths, hashes)
 - **file_versions**: Stores version history for each file
@@ -98,7 +98,7 @@ Fast Sync uses SQLite databases for storing vault data:
 
 After setting up the backend, configure the plugin in Obsidian:
 
-1. Install the Fast Sync plugin in Obsidian
+1. Install the FastSync plugin in Obsidian
 2. Open plugin settings and enter:
    - **Server URL**: URL of your backend (e.g., `http://localhost:32400`)
    - **API Key**: Same key configured in your backend

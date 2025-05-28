@@ -2,7 +2,7 @@ import logging
 import threading
 from typing import Dict, Optional
 
-from fast_sync_backend.models import StateResponseModel
+from models import StateResponseModel
 
 logger = logging.getLogger(__name__)
 

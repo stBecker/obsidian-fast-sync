@@ -1,6 +1,6 @@
 {
   "name": "fast-sync",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Sync your vaults across multiple devices, with end-to-end encryption and version history.",
   "main": "main.js",
   "scripts": {

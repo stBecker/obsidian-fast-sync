@@ -11,8 +11,8 @@ COPY uv.lock uv.lock
 
 RUN uv sync --frozen
 
-COPY fast_sync_backend/ ./fast_sync_backend/
+COPY . .
 
 RUN mkdir -p /data
 
-CMD ["uv", "run", "uvicorn", "fast_sync_backend.main:app", "--host", "0.0.0.0", "--port", "32400"]
+CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "32400"]

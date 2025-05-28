@@ -2,9 +2,9 @@ import { App, ButtonComponent, Modal, Notice, TFile } from "obsidian";
 import { base64ToArrayBuffer } from "utils/encodingUtils";
 
 import FastSyncPlugin from "../main";
-
 import { HistoryEntry, StableFileId } from "../types";
 import { ensureFoldersExist } from "../utils/fileUtils";
+import { Logger } from "../utils/logging";
 
 export class FileVersionsModal extends Modal {
   plugin: FastSyncPlugin;
@@ -27,7 +27,7 @@ export class FileVersionsModal extends Modal {
     const { contentEl } = this;
     contentEl.empty();
 
-    contentEl.createEl("h2", { text: "Version History" });
+    contentEl.createEl("h2", { text: "Version history" });
     contentEl.createEl("p", { text: `File: ${this.displayPath}` });
     contentEl.createEl("p", {
       text: `(StableID: ${this.stableId.substring(0, 10)}...)`,
@@ -44,7 +44,7 @@ export class FileVersionsModal extends Modal {
       this.isLoading = false;
       this.displayVersions();
     } catch (error) {
-      console.error(`Failed to load history for stableId ${this.stableId.substring(0, 10)} (${this.displayPath}):`, error);
+      Logger.error(`Failed to load history for stableId ${this.stableId.substring(0, 10)} (${this.displayPath}):`, error);
       this.displayError(`Failed to load versions: ${error.message}`);
     }
   }
@@ -87,7 +87,7 @@ export class FileVersionsModal extends Modal {
       infoEl.setText(`Version from ${date.toLocaleString()}`);
 
       if (index === 0) {
-        infoEl.appendText(" (Current Server Version)");
+        infoEl.appendText(" (current server version)");
       }
 
       const buttonContainer = headerEl.createDiv({
@@ -96,7 +96,7 @@ export class FileVersionsModal extends Modal {
 
       const contentEl = itemEl.createDiv({ cls: "fast-sync-version-content" });
       if (version.isBinary) {
-        contentEl.setText("[Binary Content - Cannot be previewed directly]");
+        contentEl.setText("[Binary content - cannot be previewed directly]");
       } else if (!version.content) {
         contentEl.setText("[Content seems empty]");
       } else {
@@ -127,7 +127,7 @@ export class FileVersionsModal extends Modal {
             new Notice(`Restored '${this.displayPath}' to version from ${date.toLocaleString()}`);
             this.close();
           } catch (error) {
-            console.error("Failed to restore version:", error);
+            Logger.error("Failed to restore version:", error);
             new Notice(`Failed to restore version: ${error.message}`, 5000);
             button.disabled = false;
             button.setText("Restore");
@@ -141,8 +141,8 @@ export class FileVersionsModal extends Modal {
 
     const targetPath = version.filePath;
 
-    console.info(`Attempting to restore to path: ${targetPath}`);
-    console.debug(`Restoring version data: mtime=${version.mtime}, isBinary=${version.isBinary}, contentHash=${version.contentHash}`);
+    Logger.info(`Attempting to restore to path: ${targetPath}`);
+    Logger.debug(`Restoring version data: mtime=${version.mtime}, isBinary=${version.isBinary}, contentHash=${version.contentHash}`);
 
     try {
       await ensureFoldersExist(adapter, targetPath);
@@ -161,23 +161,23 @@ export class FileVersionsModal extends Modal {
 
       const abstractFile = this.app.vault.getAbstractFileByPath(targetPath);
       if (abstractFile instanceof TFile) {
-        console.info(`Version of ${targetPath} restored locally. Triggering modify event.`);
+        Logger.info(`Version of ${targetPath} restored locally. Triggering modify event.`);
 
         this.app.metadataCache.trigger("changed", abstractFile);
         this.app.vault.trigger("modify", abstractFile);
       } else {
         const newlyCreatedFile = this.app.vault.getAbstractFileByPath(targetPath);
         if (newlyCreatedFile) {
-          console.info(`File ${targetPath} created during restore. Triggering create event.`);
+          Logger.info(`File ${targetPath} created during restore. Triggering create event.`);
           this.app.vault.trigger("create", newlyCreatedFile);
         } else {
-          console.warn(`Could not find abstract file for ${targetPath} after restore to trigger events.`);
+          Logger.warn(`Could not find abstract file for ${targetPath} after restore to trigger events.`);
         }
       }
 
-      console.info(`Next sync will upload the restored version of ${targetPath}.`);
+      Logger.info(`Next sync will upload the restored version of ${targetPath}.`);
     } catch (error) {
-      console.error(`Error during restore operation for ${targetPath}:`, error);
+      Logger.error(`Error during restore operation for ${targetPath}:`, error);
       throw new Error(`Could not write restored file: ${error.message}`);
     }
   }

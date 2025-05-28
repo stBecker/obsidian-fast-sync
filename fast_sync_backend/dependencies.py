@@ -1,7 +1,7 @@
 from fastapi import Header, HTTPException
 from starlette.status import HTTP_401_UNAUTHORIZED
 
-from fast_sync_backend.config import API_KEY
+from config import API_KEY
 
 
 async def get_api_key(x_api_key: str = Header(...)):

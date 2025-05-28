@@ -6,7 +6,7 @@ from typing import Generator
 
 from fastapi import HTTPException
 
-from fast_sync_backend.config import DB_BASE_PATH
+from config import DB_BASE_PATH
 
 logger = logging.getLogger(__name__)
 

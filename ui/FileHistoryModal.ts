@@ -3,6 +3,7 @@ import { App, FuzzyMatch, FuzzySuggestModal, Notice } from "obsidian";
 import FastSyncPlugin from "../main";
 import { FileListEntry, StableFileId } from "../types";
 import { FileVersionsModal } from "./FileVersionsModal";
+import { Logger } from "../utils/logging";
 
 interface HistoryFileItem {
   stableId: StableFileId;
@@ -38,7 +39,7 @@ export class FileHistoryModal extends FuzzySuggestModal<HistoryFileItem> {
             plaintextPath: plaintextPath,
           });
         } else {
-          console.warn(`Could not decrypt path for stableId ${entry.stableId.substring(0, 10)}...`);
+          Logger.warn(`Could not decrypt path for stableId ${entry.stableId.substring(0, 10)}...`);
         }
       }
 
@@ -47,7 +48,7 @@ export class FileHistoryModal extends FuzzySuggestModal<HistoryFileItem> {
       this.isLoading = false;
       this.setPlaceholder("Select a file to view its history");
     } catch (error) {
-      console.error("Failed to load files for history:", error);
+      Logger.error("Failed to load files for history:", error);
       new Notice(`Failed to load files: ${error.message}`);
       this.close();
     }

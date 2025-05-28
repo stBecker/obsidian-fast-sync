@@ -11,6 +11,7 @@ import {
   UploadPayloadEntry,
   VaultFileState,
 } from "./types";
+import { Logger } from "./utils/logging";
 
 function getApiHeaders(apiKey: string): Record<string, string> {
   /* ... */
@@ -26,18 +27,18 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 1): P
   try {
     const response = await fetch(url, options);
     if (!response.ok && response.status >= 500 && retries > 0) {
-      console.warn(`Request to ${url} failed with status ${response.status}. Retrying (${retries} left)...`);
+      Logger.warn(`Request to ${url} failed with status ${response.status}. Retrying (${retries} left)...`);
       await new Promise((resolve) => setTimeout(resolve, 1000));
       return fetchWithRetry(url, options, retries - 1);
     }
     return response;
   } catch (error) {
     if (retries > 0 && error instanceof TypeError) {
-      console.warn(`Request to ${url} failed with network error. Retrying (${retries} left)...`);
+      Logger.warn(`Request to ${url} failed with network error. Retrying (${retries} left)...`);
       await new Promise((resolve) => setTimeout(resolve, 1000));
       return fetchWithRetry(url, options, retries - 1);
     }
-    console.error(`Request to ${url} failed after retries or with non-retryable error:`, error);
+    Logger.error(`Request to ${url} failed after retries or with non-retryable error:`, error);
     throw error;
   }
 }
@@ -58,33 +59,33 @@ export async function downloadRemoteState(options: ApiClientOptions): Promise<Re
 
     if (!response.ok) {
       const errorBody = await response.text().catch(() => "Could not read error body");
-      console.error(`State download failed: ${response.status} ${response.statusText}`, errorBody);
+      Logger.error(`State download failed: ${response.status} ${response.statusText}`, errorBody);
       throw new Error(`State download failed: ${response.statusText} (Status: ${response.status})`);
     }
 
     const result: RemoteVaultState = await response.json();
-    console.info(`State download completed in ${(performance.now() - start).toFixed(2)}ms`);
+    Logger.info(`State download completed in ${(performance.now() - start).toFixed(2)}ms`);
 
     const processedState: { [stableId: StableFileId]: VaultFileState } = result.state || {};
 
     if (settings.encryptionPassword && encryptionKey) {
       const startDecryption = performance.now();
-      console.info("Client expects encryption, validating server state...");
+      Logger.info("Client expects encryption, validating server state...");
 
       try {
         await verifyEncryptionValidationPayload(result.encryptionValidation, encryptionKey);
 
-        console.info(`Validated server state for ${Object.keys(processedState).length} stable IDs.`);
+        Logger.info(`Validated server state for ${Object.keys(processedState).length} stable IDs.`);
       } catch (error) {
-        console.error("Encryption validation failed:", error);
+        Logger.error("Encryption validation failed:", error);
         throw error;
       }
 
-      console.info(`State validation completed in ${(performance.now() - startDecryption).toFixed(2)}ms`);
+      Logger.info(`State validation completed in ${(performance.now() - startDecryption).toFixed(2)}ms`);
     } else if (settings.encryptionPassword && !encryptionKey) {
       throw new Error("Encryption key not initialized. Cannot process potentially encrypted state.");
     } else if (!settings.encryptionPassword && result.encryptionValidation) {
-      console.warn("Server has encryption validation marker, but client encryption is disabled. State reflects encrypted paths.");
+      Logger.warn("Server has encryption validation marker, but client encryption is disabled. State reflects encrypted paths.");
       throw new Error(
         "Encryption Mismatch: Server data seems encrypted, but client encryption is disabled. Enable encryption or Force Push.",
       );
@@ -95,7 +96,7 @@ export async function downloadRemoteState(options: ApiClientOptions): Promise<Re
       encryptionValidation: result.encryptionValidation,
     };
   } catch (error) {
-    console.error("Error during downloadRemoteState:", error);
+    Logger.error("Error during downloadRemoteState:", error);
     if (
       error instanceof Error &&
       (error.message.includes("Encryption Mismatch") ||
@@ -115,7 +116,7 @@ export async function downloadRemoteState(options: ApiClientOptions): Promise<Re
 export async function uploadFileChanges(uploadEntries: UploadPayloadEntry[], options: ApiClientOptions): Promise<void> {
   const { settings, encryptionKey } = options;
   if (uploadEntries.length === 0) {
-    console.debug("No changes to upload.");
+    Logger.debug("No changes to upload.");
     return;
   }
 
@@ -149,15 +150,15 @@ export async function uploadFileChanges(uploadEntries: UploadPayloadEntry[], opt
           /* ignore json parse error */
         }
       }
-      console.error(detail, errorBody);
+      Logger.error(detail, errorBody);
       throw new Error(detail);
     }
 
-    console.info(
+    Logger.info(
       `Uploaded ${payload.data.length} changes in ${(performance.now() - start).toFixed(2)}ms (Upload request: ${(performance.now() - uploadStart).toFixed(2)}ms)`,
     );
   } catch (error) {
-    console.error("Error during uploadFileChanges:", error);
+    Logger.error("Error during uploadFileChanges:", error);
     if (error instanceof Error && (error.message.includes("Encryption Mismatch") || error.message.includes("Encryption Key Mismatch"))) {
       throw error;
     }
@@ -190,16 +191,16 @@ export async function downloadFilesContent(encryptedFilePaths: string[], options
 
     if (!response.ok) {
       const errorBody = await response.text().catch(() => "Could not read error body");
-      console.error(`File download request failed: ${response.status} ${response.statusText}`, errorBody);
+      Logger.error(`File download request failed: ${response.status} ${response.statusText}`, errorBody);
       throw new Error(`File download failed: ${response.statusText} (Status: ${response.status})`);
     }
 
     const result: { files: DownloadedFileContent[] } = await response.json();
-    console.info(`Downloaded content for ${result.files.length} encrypted paths in ${(performance.now() - start).toFixed(2)}ms`);
+    Logger.info(`Downloaded content for ${result.files.length} encrypted paths in ${(performance.now() - start).toFixed(2)}ms`);
 
     return result.files;
   } catch (error) {
-    console.error("Error during downloadFilesContent:", error);
+    Logger.error("Error during downloadFilesContent:", error);
 
     throw new Error(`Failed to download file content: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -222,23 +223,23 @@ export async function getAllServerFilesList(options: ApiClientOptions): Promise<
 
     if (!response.ok) {
       const errorBody = await response.text().catch(() => "Could not read error body");
-      console.error(`Failed to get all files list: ${response.status} ${response.statusText}`, errorBody);
+      Logger.error(`Failed to get all files list: ${response.status} ${response.statusText}`, errorBody);
       throw new Error(`Failed to get files list: ${response.statusText} (Status: ${response.status})`);
     }
 
     const result: FileListEntry[] = await response.json();
-    console.info(`All files list retrieved (${result.length} files raw) in ${(performance.now() - start).toFixed(2)}ms`);
+    Logger.info(`All files list retrieved (${result.length} files raw) in ${(performance.now() - start).toFixed(2)}ms`);
 
     if (!settings.encryptionPassword && result.length > 0 && result[0].currentEncryptedFilePath.length > 100) {
-      console.warn("Received file list paths look potentially encrypted, but client encryption is disabled.");
+      Logger.warn("Received file list paths look potentially encrypted, but client encryption is disabled.");
     } else if (settings.encryptionPassword && !encryptionKey) {
-      console.error("Encryption key not initialized. Cannot decrypt file paths from list if needed later.");
+      Logger.error("Encryption key not initialized. Cannot decrypt file paths from list if needed later.");
     }
 
-    console.info(`Processed all files list contains ${result.length} files.`);
+    Logger.info(`Processed all files list contains ${result.length} files.`);
     return result;
   } catch (error) {
-    console.error("Error during getAllServerFilesList:", error);
+    Logger.error("Error during getAllServerFilesList:", error);
 
     throw new Error(`Failed to retrieve file list from server: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -262,11 +263,11 @@ export async function getFileHistoryFromServer(stableId: StableFileId, options: 
 
     if (!response.ok) {
       if (response.status === 404) {
-        console.info(`File history not found for stableId ${stableId.substring(0, 10)}...`);
+        Logger.info(`File history not found for stableId ${stableId.substring(0, 10)}...`);
         return [];
       }
       const errorBody = await response.text().catch(() => "Could not read error body");
-      console.error(
+      Logger.error(
         `Failed to get file history for stableId ${stableId.substring(0, 10)}: ${response.status} ${response.statusText}`,
         errorBody,
       );
@@ -274,14 +275,14 @@ export async function getFileHistoryFromServer(stableId: StableFileId, options: 
     }
 
     const result: any[] = await response.json();
-    console.info(
+    Logger.info(
       `File history retrieved for stableId ${stableId.substring(0, 10)} (${result.length} versions raw) in ${(performance.now() - start).toFixed(2)}ms`,
     );
 
     let processedHistory: ClientHistoryEntry[] = [];
     if (settings.encryptionPassword && encryptionKey && result.length > 0) {
       const decryptionStart = performance.now();
-      console.info(`Decrypting content for ${result.length} history entries for stableId ${stableId.substring(0, 10)}...`);
+      Logger.info(`Decrypting content for ${result.length} history entries for stableId ${stableId.substring(0, 10)}...`);
       try {
         for (const entry of result) {
           const decryptedFilePath = await decryptText(entry.filePath, encryptionKey);
@@ -295,9 +296,9 @@ export async function getFileHistoryFromServer(stableId: StableFileId, options: 
             version_time: entry.version_time,
           });
         }
-        console.info(`Decryption of history entries complete in ${(performance.now() - decryptionStart).toFixed(2)}ms`);
+        Logger.info(`Decryption of history entries complete in ${(performance.now() - decryptionStart).toFixed(2)}ms`);
       } catch (decErr) {
-        console.error(`Failed to decrypt history entry for stableId ${stableId.substring(0, 10)}:`, decErr);
+        Logger.error(`Failed to decrypt history entry for stableId ${stableId.substring(0, 10)}:`, decErr);
         throw new Error("Failed to decrypt file history content. Key mismatch or data corrupted?");
       }
     } else if (!settings.encryptionPassword && result.length > 0) {
@@ -310,7 +311,7 @@ export async function getFileHistoryFromServer(stableId: StableFileId, options: 
         version_time: entry.version_time,
       }));
       if (result[0].filePath.length > 100) {
-        console.warn(
+        Logger.warn(
           `Received history for stableId ${stableId.substring(0, 10)} looks potentially encrypted, but client encryption is disabled.`,
         );
       }
@@ -320,7 +321,7 @@ export async function getFileHistoryFromServer(stableId: StableFileId, options: 
 
     return processedHistory;
   } catch (error) {
-    console.error(`Error during getFileHistoryFromServer for stableId ${stableId.substring(0, 10)}:`, error);
+    Logger.error(`Error during getFileHistoryFromServer for stableId ${stableId.substring(0, 10)}:`, error);
     if (error instanceof Error && (error.message.includes("Key Mismatch") || error.message.includes("Decryption failed"))) {
       throw error;
     }
@@ -356,7 +357,7 @@ export async function resetServerStateForForcePush(options: ApiClientOptions): P
 
     if (!response.ok) {
       const errorBody = await response.text().catch(() => "Could not read error body");
-      console.error(`Force push reset failed: ${response.status} ${response.statusText}`, errorBody);
+      Logger.error(`Force push reset failed: ${response.status} ${response.statusText}`, errorBody);
       throw new Error(`Force push reset failed: ${response.statusText} (Status: ${response.status})`);
     }
 
@@ -364,9 +365,9 @@ export async function resetServerStateForForcePush(options: ApiClientOptions): P
     if (result.status !== "reset_success") {
       throw new Error(`Server reported failure during force push reset: ${result.status}`);
     }
-    console.warn(`Server state reset successfully for vault ${settings.vaultId} in ${(performance.now() - start).toFixed(2)}ms`);
+    Logger.warn(`Server state reset successfully for vault ${settings.vaultId} in ${(performance.now() - start).toFixed(2)}ms`);
   } catch (error) {
-    console.error("Error during resetServerStateForForcePush:", error);
+    Logger.error("Error during resetServerStateForForcePush:", error);
     throw new Error(`Failed to reset server state for force push: ${error instanceof Error ? error.message : String(error)}`);
   }
 }

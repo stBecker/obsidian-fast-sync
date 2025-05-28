@@ -13,11 +13,14 @@ export class FastSyncSettingTab extends PluginSettingTab {
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl("h2", { text: "Fast Sync Settings" });
+
+    new Setting(containerEl)
+      .setName("Backend connectivity")
+      .setHeading();
 
     new Setting(containerEl)
       .setName("Server URL")
-      .setDesc("The base URL of your Fast Sync server (e.g., http://localhost:32400)")
+      .setDesc("The base URL of your FastSync server (e.g., http://localhost:32400)")
       .addText((text) =>
         text
           .setPlaceholder("Enter server URL")
@@ -29,7 +32,7 @@ export class FastSyncSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("API Key")
+      .setName("API key")
       .setDesc("The secret API key for authentication with the server.")
       .addText((text) =>
         text
@@ -61,86 +64,9 @@ export class FastSyncSettingTab extends PluginSettingTab {
           }),
       );
 
-    containerEl.createEl("h3", { text: "Sync Behavior" });
-
     new Setting(containerEl)
-      .setName("Sync Interval")
-      .setDesc("How often to automatically sync (in seconds). Minimum 5 seconds.")
-      .addText((text) =>
-        text
-          .setPlaceholder("e.g., 60")
-          .setValue(this.plugin.settings.syncInterval.toString())
-          .onChange(async (value) => {
-            let interval = parseInt(value);
-            if (isNaN(interval) || interval < 5) {
-              interval = 5;
-              new Notice("Sync interval must be at least 5 seconds.");
-            }
-            this.plugin.settings.syncInterval = interval;
-            text.setValue(interval.toString());
-            await this.plugin.saveSettings();
-            this.plugin.rescheduleSync();
-          }),
-      );
-
-    new Setting(containerEl)
-      .setName("Full Rehash Interval")
-      .setDesc(
-        "How often (in minutes) to clear the local hash cache and re-check all files against the server. Helps catch inconsistencies. Minimum 5 minutes.",
-      )
-      .addText((text) =>
-        text
-          .setPlaceholder("e.g., 15")
-          .setValue(this.plugin.settings.fullRehashInterval.toString())
-          .onChange(async (value) => {
-            let interval = parseInt(value);
-            if (isNaN(interval) || interval < 5) {
-              interval = 5;
-              new Notice("Full rehash interval must be at least 5 minutes.");
-            }
-            this.plugin.settings.fullRehashInterval = interval;
-            text.setValue(interval.toString());
-            await this.plugin.saveSettings();
-          }),
-      );
-
-    new Setting(containerEl)
-      .setName("Maximum File Size (MB)")
-      .setDesc("Files larger than this size (in megabytes) will be skipped during sync. Minimum 1 MB.")
-      .addText((text) =>
-        text
-          .setPlaceholder("e.g., 100")
-          .setValue(this.plugin.settings.maxFileSizeMB.toString())
-          .onChange(async (value) => {
-            let size = parseInt(value);
-            if (isNaN(size) || size < 1) {
-              size = 1;
-              new Notice("Maximum file size must be at least 1 MB.");
-            }
-            this.plugin.settings.maxFileSizeMB = size;
-            text.setValue(size.toString());
-            await this.plugin.saveSettings();
-          }),
-      );
-
-    new Setting(containerEl)
-      .setName("Sync Plugins")
-      .setDesc("Enable syncing of installed plugin files (main.js, manifest.json, styles.css). Requires Obsidian restart after changing.")
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.syncPlugins).onChange(async (value) => {
-          this.plugin.settings.syncPlugins = value;
-          await this.plugin.saveSettings();
-          new Notice("Plugin sync setting changed. Please restart Obsidian for it to take full effect.", 5000);
-        }),
-      );
-
-    containerEl.createEl("h3", { text: "Encryption" });
-
-    new Setting(containerEl)
-      .setName("Encryption Password")
-      .setDesc(
-        'Password used to encrypt your data before sending it to the server. Setting or changing this requires a "Force Push" to encrypt existing data or re-encrypt with the new password. Losing this password means losing access to your encrypted data! Leave blank to disable encryption.',
-      )
+      .setName("Encryption password")
+      .setDesc("Password used to encrypt your data before sending it to the server. Setting or changing this requires a force push to encrypt existing data or re-encrypt with the new password. Losing this password means losing access to your encrypted data! Leave blank to disable encryption.")
       .addText((text) =>
         text
           .setPlaceholder("Leave blank for no encryption")
@@ -170,10 +96,87 @@ export class FastSyncSettingTab extends PluginSettingTab {
           }),
       );
 
-    containerEl.createEl("h3", { text: "Manual Actions & Status" });
+    new Setting(containerEl)
+      .setName("Sync behavior")
+      .setHeading();
 
     new Setting(containerEl)
-      .setName("Sync Status")
+      .setName("Sync interval")
+      .setDesc("How often to automatically sync (in seconds). Minimum 5 seconds.")
+      .addText((text) =>
+        text
+          .setPlaceholder("e.g., 60")
+          .setValue(this.plugin.settings.syncInterval.toString())
+          .onChange(async (value) => {
+            let interval = parseInt(value);
+            if (isNaN(interval) || interval < 5) {
+              interval = 5;
+              new Notice("Sync interval must be at least 5 seconds.");
+            }
+            this.plugin.settings.syncInterval = interval;
+            text.setValue(interval.toString());
+            await this.plugin.saveSettings();
+            this.plugin.rescheduleSync();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Full rehash interval")
+      .setDesc(
+        "How often (in minutes) to clear the local hash cache and re-check all files against the server. Helps catch inconsistencies. Minimum 5 minutes.",
+      )
+      .addText((text) =>
+        text
+          .setPlaceholder("e.g., 15")
+          .setValue(this.plugin.settings.fullRehashInterval.toString())
+          .onChange(async (value) => {
+            let interval = parseInt(value);
+            if (isNaN(interval) || interval < 5) {
+              interval = 5;
+              new Notice("Full rehash interval must be at least 5 minutes.");
+            }
+            this.plugin.settings.fullRehashInterval = interval;
+            text.setValue(interval.toString());
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Maximum file size (MB)")
+      .setDesc("Files larger than this size (in megabytes) will be skipped during sync. Minimum 1 MB.")
+      .addText((text) =>
+        text
+          .setPlaceholder("e.g., 100")
+          .setValue(this.plugin.settings.maxFileSizeMB.toString())
+          .onChange(async (value) => {
+            let size = parseInt(value);
+            if (isNaN(size) || size < 1) {
+              size = 1;
+              new Notice("Maximum file size must be at least 1 MB.");
+            }
+            this.plugin.settings.maxFileSizeMB = size;
+            text.setValue(size.toString());
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName("Sync plugins")
+      .setDesc("Enable syncing of installed plugin files (main.js, manifest.json, styles.css). Requires Obsidian restart after changing.")
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.syncPlugins).onChange(async (value) => {
+          this.plugin.settings.syncPlugins = value;
+          await this.plugin.saveSettings();
+          new Notice("Plugin sync setting changed. Please restart Obsidian for it to take full effect.", 5000);
+        }),
+      );
+
+    new Setting(containerEl)
+      .setName("Manual actions & status")
+      .setHeading();
+
+    new Setting(containerEl)
+      .setName("Sync status")
       .setDesc("Pause or resume automatic background synchronization.")
       .addToggle((toggle) => {
         const updateStatus = () => {
@@ -196,11 +199,11 @@ export class FastSyncSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
-      .setName("Force Push State")
+      .setName("Force push state")
       .setDesc("Overwrite server state with local state. Deletes files on server not present locally. Use with caution!")
       .addButton((button) =>
         button
-          .setButtonText("Force Push")
+          .setButtonText("Force push")
           .setWarning()
           .onClick(async () => {
             button.setDisabled(true).setButtonText("Pushing...");
@@ -210,17 +213,17 @@ export class FastSyncSettingTab extends PluginSettingTab {
             } catch (e) {
               new Notice(`Force push failed: ${e.message}`, 10000);
             } finally {
-              button.setDisabled(false).setButtonText("Force Push");
+              button.setDisabled(false).setButtonText("Force push");
             }
           }),
       );
 
     new Setting(containerEl)
-      .setName("Force Pull State")
+      .setName("Force pull state")
       .setDesc("Overwrite local state with server state. Deletes local files not present on server. Use with caution!")
       .addButton((button) =>
         button
-          .setButtonText("Force Pull")
+          .setButtonText("Force pull")
           .setWarning()
           .onClick(async () => {
             button.setDisabled(true).setButtonText("Pulling...");
@@ -230,15 +233,17 @@ export class FastSyncSettingTab extends PluginSettingTab {
             } catch (e) {
               new Notice(`Force pull failed: ${e.message}`, 10000);
             } finally {
-              button.setDisabled(false).setButtonText("Force Pull");
+              button.setDisabled(false).setButtonText("Force pull");
             }
           }),
       );
 
-    containerEl.createEl("h3", { text: "Troubleshooting & Logging" });
+    new Setting(containerEl)
+      .setName("Troubleshooting & logging")
+      .setHeading();
 
     new Setting(containerEl)
-      .setName("Verbose Logging")
+      .setName("Verbose logging")
       .setDesc("Enable detailed logging with access to the log viewer. When disabled, only error logs are emitted to the console.")
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.enableVerboseLogging).onChange(async (value) => {
@@ -253,10 +258,10 @@ export class FastSyncSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("Clean Empty Folders")
+      .setName("Clean empty folders")
       .setDesc("Manually run the process to remove empty folders within your vault.")
       .addButton((button) =>
-        button.setButtonText("Clean Now").onClick(async () => {
+        button.setButtonText("Clean now").onClick(async () => {
           button.setDisabled(true).setButtonText("Cleaning...");
           try {
             await this.plugin.runCleanEmptyFolders();
@@ -264,7 +269,7 @@ export class FastSyncSettingTab extends PluginSettingTab {
           } catch (e) {
             new Notice(`Folder cleanup failed: ${e.message}`, 5000);
           } finally {
-            button.setDisabled(false).setButtonText("Clean Now");
+            button.setDisabled(false).setButtonText("Clean now");
           }
         }),
       );

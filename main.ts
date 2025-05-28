@@ -1,4 +1,4 @@
-import { Notice, Plugin, TFile, addIcon } from "obsidian";
+import { Notice, Plugin, TFile } from "obsidian";
 
 import * as FastSyncApi from "./api";
 import { DEFAULT_SETTINGS, DOWNLOAD_CHUNK_FILE_COUNT, UPLOAD_CHUNK_SIZE_BYTES } from "./constants";
@@ -19,13 +19,10 @@ import {
 import { FileHistoryModal } from "./ui/FileHistoryModal";
 import { FileVersionsModal } from "./ui/FileVersionsModal";
 import { LogViewerModal } from "./ui/LogViewerModal";
-
 import { base64ToArrayBuffer } from "./utils/encodingUtils";
 import { cleanEmptyFolders, ensureFoldersExist, getAllUserFiles, getFileContent, getPluginFiles } from "./utils/fileUtils";
 import { ContentHashCache, hashFileContentFast, hashStringSHA256 } from "./utils/hashUtils";
-import { setupConsoleLogCapture } from "./utils/logging";
-
-const SYNC_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-refresh-cw"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M3 12a9 9 0 0 1 15-6.74"/><path d="M3 8v5h5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/></svg>`;
+import { Logger } from "./utils/logging";
 
 export default class FastSyncPlugin extends Plugin {
   settings: FastSyncPluginSettings;
@@ -42,9 +39,9 @@ export default class FastSyncPlugin extends Plugin {
   private currentRemoteState: RemoteVaultState | null = null;
 
   async onload() {
-    console.info("Loading Fast Sync Plugin...");
     await this.loadSettings();
-    setupConsoleLogCapture(this.settings.enableVerboseLogging);
+    Logger.setup(this.settings.enableVerboseLogging);
+    Logger.info("Loading FastSync plugin...");
 
     this.contentHashCache = new ContentHashCache();
     this.vaultAdapter = this.app.vault.adapter;
@@ -54,44 +51,43 @@ export default class FastSyncPlugin extends Plugin {
     if (!this.settings.vaultId) {
       this.settings.vaultId = this.app.vault.getName();
       await this.saveSettings();
-      console.info(`Vault ID initialized to: ${this.settings.vaultId}`);
+      Logger.info(`Vault ID initialized to: ${this.settings.vaultId}`);
     }
 
     if (this.settings.encryptionPassword) {
       try {
         this.encryptionKey = await deriveEncryptionKey(this.settings.encryptionPassword);
-        console.info("Encryption key derived successfully.");
+        Logger.info("Encryption key derived successfully.");
       } catch (error) {
-        console.error("Failed to initialize encryption on load:", error);
+        Logger.error("Failed to initialize encryption on load:", error);
         new Notice(`Error initializing encryption: ${error.message}. Sync might fail.`, 10000);
       }
     }
 
     this.statusBarItemEl = this.addStatusBarItem();
     this.updateStatusBar();
-    addIcon("fast-sync-icon", SYNC_ICON);
-    this.addRibbonIcon("fast-sync-icon", "Fast Sync: Sync Now", () => this.requestSync());
-    this.addRibbonIcon("history", "Fast Sync: View File History", () => this.openFileHistoryModal());
+    this.addRibbonIcon("folder-sync", "FastSync: Sync now", () => this.requestSync());
+    this.addRibbonIcon("history", "FastSync: View file history", () => this.openFileHistoryModal());
 
     // Only add log viewer ribbon icon if verbose logging is enabled
     if (this.settings.enableVerboseLogging) {
-      this.addRibbonIcon("clipboard-list", "Fast Sync: View Logs", () => this.openLogViewerModal());
+      this.addRibbonIcon("logs", "FastSync: View logs", () => this.openLogViewerModal());
     }
     this.addSettingTab(new FastSyncSettingTab(this.app, this));
 
     this.addCommand({
       id: "sync-now",
-      name: "Sync Now",
+      name: "Sync now",
       callback: () => this.requestSync(),
     });
     this.addCommand({
       id: "open-file-history-modal",
-      name: "Open File History Browser",
+      name: "Open file history browser",
       callback: () => this.openFileHistoryModal(),
     });
     this.addCommand({
       id: "view-current-file-history",
-      name: "View History for Current File",
+      name: "View history for current file",
       checkCallback: (checking) => {
         const activeFile = this.app.workspace.getActiveFile();
         if (activeFile) {
@@ -105,7 +101,7 @@ export default class FastSyncPlugin extends Plugin {
     });
     this.addCommand({
       id: "open-sync-log",
-      name: "Open Sync Log Viewer",
+      name: "Open sync log viewer",
       checkCallback: (checking) => {
         if (this.settings.enableVerboseLogging) {
           if (!checking) {
@@ -118,7 +114,7 @@ export default class FastSyncPlugin extends Plugin {
     });
     this.addCommand({
       id: "toggle-sync-pause",
-      name: "Toggle Sync Pause/Resume",
+      name: "Toggle sync pause/resume",
       callback: () => {
         /* ... */ this.syncPaused = !this.syncPaused;
         new Notice(this.syncPaused ? "Sync paused" : "Sync resumed");
@@ -138,11 +134,11 @@ export default class FastSyncPlugin extends Plugin {
     await this.runCleanEmptyFolders();
     setTimeout(() => this.requestSync(), 5000);
 
-    console.info("Fast Sync Plugin loaded successfully.");
+    Logger.info("FastSync Plugin loaded successfully.");
   }
 
   onunload() {
-    console.info("Unloading Fast Sync Plugin...");
+    Logger.info("Unloading FastSync Plugin...");
     if (this.syncIntervalId !== null) {
       window.clearInterval(this.syncIntervalId);
       this.syncIntervalId = null;
@@ -161,35 +157,35 @@ export default class FastSyncPlugin extends Plugin {
     if (this.settings.syncInterval > 0) {
       this.syncIntervalId = window.setInterval(() => this.requestSync(), this.settings.syncInterval * 1000);
       this.registerInterval(this.syncIntervalId);
-      console.info(`Sync scheduled every ${this.settings.syncInterval} seconds.`);
+      Logger.info(`Sync scheduled every ${this.settings.syncInterval} seconds.`);
     } else {
-      console.info("Sync interval is 0, automatic sync disabled.");
+      Logger.info("Sync interval is 0, automatic sync disabled.");
       this.syncIntervalId = null;
     }
   }
   async requestSync() {
     if (this.syncPaused) {
-      console.info("Sync requested but currently paused.");
+      Logger.info("Sync requested but currently paused.");
       this.updateStatusBar("Sync paused");
       return;
     }
     if (this.syncing) {
-      console.info("Sync requested but already in progress.");
+      Logger.info("Sync requested but already in progress.");
       return;
     }
     this.syncing = true;
     this.updateStatusBar("Syncing...");
     try {
-      console.info(`Sync started at ${new Date().toLocaleTimeString()}`);
+      Logger.info(`Sync started at ${new Date().toLocaleTimeString()}`);
       const syncStart = performance.now();
       await this.executeSync();
       this.settings.lastSync = Date.now();
       await this.saveSettings();
       const duration = (performance.now() - syncStart) / 1000;
-      console.info(`Sync finished successfully in ${duration.toFixed(2)}s`);
+      Logger.info(`Sync finished successfully in ${duration.toFixed(2)}s`);
       this.updateStatusBar();
     } catch (error) {
-      console.error("Sync failed:", error);
+      Logger.error("Sync failed:", error);
       const errorMessage = error instanceof Error ? error.message : String(error);
       new Notice(`Sync failed: ${errorMessage}`, 10000);
       this.updateStatusBar("Sync failed!");
@@ -209,7 +205,7 @@ export default class FastSyncPlugin extends Plugin {
     const now = Date.now();
 
     if (now - this.lastFullRehash > this.settings.fullRehashInterval * 60 * 1000) {
-      console.info("Performing periodic full rehash...");
+      Logger.info("Performing periodic full rehash...");
       this.contentHashCache.clear();
       this.lastFullRehash = now;
       await this.runCleanEmptyFolders();
@@ -224,23 +220,23 @@ export default class FastSyncPlugin extends Plugin {
       await this.processDeletions(apiOptions);
     }
 
-    console.info("Downloading remote state...");
+    Logger.info("Downloading remote state...");
 
     this.currentRemoteState = await FastSyncApi.downloadRemoteState(apiOptions);
     const remoteStateMap = this.currentRemoteState.state;
     const remoteStableIds = Object.keys(remoteStateMap);
-    console.info(`Found ${remoteStableIds.length} stable IDs in remote state.`);
+    Logger.info(`Found ${remoteStableIds.length} stable IDs in remote state.`);
 
-    console.info("Scanning local files...");
+    Logger.info("Scanning local files...");
     const localFilePaths = await getAllUserFiles(this.app.vault);
     if (this.settings.syncPlugins) {
       const pluginFiles = await getPluginFiles(this.app.vault);
-      console.info(`Including ${pluginFiles.length} plugin files.`);
+      Logger.info(`Including ${pluginFiles.length} plugin files.`);
       localFilePaths.push(...pluginFiles);
     }
-    console.info(`Found ${localFilePaths.length} local files to consider.`);
+    Logger.info(`Found ${localFilePaths.length} local files to consider.`);
 
-    console.info("Comparing local and remote states using stableId...");
+    Logger.info("Comparing local and remote states using stableId...");
     const comparisonStart = performance.now();
 
     const uploadEntries: UploadPayloadEntry[] = [];
@@ -255,7 +251,7 @@ export default class FastSyncPlugin extends Plugin {
         const stat = await this.vaultAdapter.stat(localPath);
         if (!stat) continue;
         if (stat.size > maxFileSizeBytes) {
-          console.debug(`Skipping large file: ${localPath}`);
+          Logger.debug(`Skipping large file: ${localPath}`);
           continue;
         }
 
@@ -272,7 +268,7 @@ export default class FastSyncPlugin extends Plugin {
         const localMtime = stat.mtime;
 
         if (!remoteMeta) {
-          console.debug(`[UPLOAD] New local file (StableID: ${stableId.substring(0, 10)}): ${localPath}`);
+          Logger.debug(`[UPLOAD] New local file (StableID: ${stableId.substring(0, 10)}): ${localPath}`);
 
           if (!fileContentData) fileContentData = await getFileContent(this.vaultAdapter, localPath);
           uploadEntries.push(
@@ -280,7 +276,7 @@ export default class FastSyncPlugin extends Plugin {
           );
         } else if (remoteMeta.deleted) {
           if (localMtime > remoteMeta.currentMtime) {
-            console.warn(
+            Logger.warn(
               `[UPLOAD/UNDELETE] Local file '${localPath}' (StableID: ${stableId.substring(0, 10)}) modified after server deletion. Uploading.`,
             );
             if (!fileContentData) fileContentData = await getFileContent(this.vaultAdapter, localPath);
@@ -289,23 +285,23 @@ export default class FastSyncPlugin extends Plugin {
               await this.prepareUploadEntry(localPath, stableId, fileContentData, localContentHash, localMtime, false, apiOptions),
             );
           } else {
-            console.warn(
+            Logger.warn(
               `[DELETE LOCAL] Server marked '${localPath}' (StableID: ${stableId.substring(0, 10)}) as deleted more recently. Will delete local file.`,
             );
           }
         } else if (remoteMeta.currentContentHash !== localContentHash) {
-          console.debug(`[DIFF] Hash mismatch for ${localPath} (StableID: ${stableId.substring(0, 10)})`);
+          Logger.debug(`[DIFF] Hash mismatch for ${localPath} (StableID: ${stableId.substring(0, 10)})`);
           if (localMtime > remoteMeta.currentMtime) {
-            console.debug(`[UPLOAD] Local file newer: ${localPath}`);
+            Logger.debug(`[UPLOAD] Local file newer: ${localPath}`);
             if (!fileContentData) fileContentData = await getFileContent(this.vaultAdapter, localPath);
             uploadEntries.push(
               await this.prepareUploadEntry(localPath, stableId, fileContentData, localContentHash, localMtime, false, apiOptions),
             );
           } else if (localMtime < remoteMeta.currentMtime) {
-            console.debug(`[DOWNLOAD] Remote file newer: ${localPath}`);
+            Logger.debug(`[DOWNLOAD] Remote file newer: ${localPath}`);
             filesToDownloadStableIds.add(stableId);
           } else {
-            console.warn(`[CONFLICT/UPLOAD] Hash mismatch, same mtime for ${localPath}. Uploading local.`);
+            Logger.warn(`[CONFLICT/UPLOAD] Hash mismatch, same mtime for ${localPath}. Uploading local.`);
             if (!fileContentData) fileContentData = await getFileContent(this.vaultAdapter, localPath);
             uploadEntries.push(
               await this.prepareUploadEntry(localPath, stableId, fileContentData, localContentHash, localMtime, false, apiOptions),
@@ -313,7 +309,7 @@ export default class FastSyncPlugin extends Plugin {
           }
         }
       } catch (error) {
-        console.error(`Error processing local file ${localPath} during comparison:`, error);
+        Logger.error(`Error processing local file ${localPath} during comparison:`, error);
       }
     }
 
@@ -334,32 +330,32 @@ export default class FastSyncPlugin extends Plugin {
       if (potentialLocalPath && !processedLocalPaths.has(potentialLocalPath) && !remoteMeta.deleted) {
         const isPluginFile = potentialLocalPath.startsWith(this.app.vault.configDir + "/plugins/");
         if (!this.settings.syncPlugins && isPluginFile) {
-          console.debug(`[SKIP DOWNLOAD] Plugin file ${potentialLocalPath} (StableID: ${remoteStableId.substring(0, 10)}) skipped.`);
+          Logger.debug(`[SKIP DOWNLOAD] Plugin file ${potentialLocalPath} (StableID: ${remoteStableId.substring(0, 10)}) skipped.`);
           continue;
         }
 
-        console.debug(`[DOWNLOAD] New remote file (StableID: ${remoteStableId.substring(0, 10)}): ${potentialLocalPath}`);
+        Logger.debug(`[DOWNLOAD] New remote file (StableID: ${remoteStableId.substring(0, 10)}): ${potentialLocalPath}`);
         filesToDownloadStableIds.add(remoteStableId);
       }
     }
 
-    console.info(
+    Logger.info(
       `Comparison complete in ${(performance.now() - comparisonStart).toFixed(2)}ms. ` +
         `Uploads: ${uploadEntries.length}, Downloads: ${filesToDownloadStableIds.size}`,
     );
 
     if (uploadEntries.length > 0) {
-      console.info(`Starting upload of ${uploadEntries.length} entries...`);
+      Logger.info(`Starting upload of ${uploadEntries.length} entries...`);
       await this.processFileUploads(uploadEntries, apiOptions);
     } else {
-      console.info("No files to upload.");
+      Logger.info("No files to upload.");
     }
 
     if (filesToDownloadStableIds.size > 0) {
-      console.info(`Starting download for ${filesToDownloadStableIds.size} stable IDs...`);
+      Logger.info(`Starting download for ${filesToDownloadStableIds.size} stable IDs...`);
       await this.processFileDownloads([...filesToDownloadStableIds], apiOptions);
     } else {
-      console.info("No files to download.");
+      Logger.info("No files to download.");
     }
 
     this.currentRemoteState = null;
@@ -403,7 +399,7 @@ export default class FastSyncPlugin extends Plugin {
     const deletionEntries: UploadPayloadEntry[] = [];
     const pathsToDelete = [...this.settings.deletionQueue];
 
-    console.info(`Processing ${pathsToDelete.length} local deletions...`);
+    Logger.info(`Processing ${pathsToDelete.length} local deletions...`);
 
     for (const plaintextPath of pathsToDelete) {
       try {
@@ -420,12 +416,12 @@ export default class FastSyncPlugin extends Plugin {
         );
         deletionEntries.push(deletionEntry);
       } catch (error) {
-        console.error(`Error preparing deletion entry for ${plaintextPath}:`, error);
+        Logger.error(`Error preparing deletion entry for ${plaintextPath}:`, error);
       }
     }
 
     if (deletionEntries.length === 0) {
-      console.info("No valid deletion entries prepared.");
+      Logger.info("No valid deletion entries prepared.");
 
       this.settings.deletionQueue = [];
       await this.saveSettings();
@@ -437,9 +433,9 @@ export default class FastSyncPlugin extends Plugin {
 
       this.settings.deletionQueue = [];
       await this.saveSettings();
-      console.info(`Deletions processed successfully in ${(performance.now() - deletionsStart).toFixed(2)}ms`);
+      Logger.info(`Deletions processed successfully in ${(performance.now() - deletionsStart).toFixed(2)}ms`);
     } catch (error) {
-      console.error("Failed to process deletions:", error);
+      Logger.error("Failed to process deletions:", error);
 
       throw new Error(`Failed to inform server about deletions: ${error.message}`);
     }
@@ -447,7 +443,7 @@ export default class FastSyncPlugin extends Plugin {
 
   /** Sends prepared upload entries in chunks. */
   private async processFileUploads(uploadEntries: UploadPayloadEntry[], apiOptions: ApiClientOptions) {
-    console.info(`Uploading ${uploadEntries.length} prepared entries...`);
+    Logger.info(`Uploading ${uploadEntries.length} prepared entries...`);
     const uploadStart = performance.now();
 
     let chunk: UploadPayloadEntry[] = [];
@@ -460,13 +456,13 @@ export default class FastSyncPlugin extends Plugin {
       currentChunkSize += entry.content.length;
 
       if (currentChunkSize >= UPLOAD_CHUNK_SIZE_BYTES || i === uploadEntries.length - 1) {
-        console.info(
+        Logger.info(
           `Uploading chunk ${Math.ceil((i + 1) / chunk.length)}: ${chunk.length} entries (${(currentChunkSize / (1024 * 1024)).toFixed(2)} MB estimated)...`,
         );
         try {
           await FastSyncApi.uploadFileChanges(chunk, apiOptions);
         } catch (error) {
-          console.error(`Failed to upload chunk: ${error}`);
+          Logger.error(`Failed to upload chunk: ${error}`);
 
           throw new Error(`Failed to upload chunk: ${error.message}`);
         }
@@ -475,16 +471,16 @@ export default class FastSyncPlugin extends Plugin {
         currentChunkSize = 0;
       }
     }
-    console.info(`File uploads completed in ${(performance.now() - uploadStart).toFixed(2)}ms`);
+    Logger.info(`File uploads completed in ${(performance.now() - uploadStart).toFixed(2)}ms`);
   }
 
   /** Downloads file content for specified stable IDs in chunks and saves them locally. */
   private async processFileDownloads(stableIdsToDownload: StableFileId[], apiOptions: ApiClientOptions) {
-    console.info(`Requesting downloads for ${stableIdsToDownload.length} stable IDs...`);
+    Logger.info(`Requesting downloads for ${stableIdsToDownload.length} stable IDs...`);
     const downloadStart = performance.now();
 
     if (!this.currentRemoteState) {
-      console.error("Cannot process downloads: Remote state is missing.");
+      Logger.error("Cannot process downloads: Remote state is missing.");
       throw new Error("Internal error: Remote state not available for download process.");
     }
     const remoteStateMap = this.currentRemoteState.state;
@@ -495,20 +491,20 @@ export default class FastSyncPlugin extends Plugin {
       if (remoteMeta && !remoteMeta.deleted) {
         encryptedPathsToRequest.push(remoteMeta.currentEncryptedFilePath);
       } else {
-        console.warn(`Skipping download for stableId ${stableId.substring(0, 10)}: Not found in remote state or marked deleted.`);
+        Logger.warn(`Skipping download for stableId ${stableId.substring(0, 10)}: Not found in remote state or marked deleted.`);
       }
     }
 
     if (encryptedPathsToRequest.length === 0) {
-      console.info("No valid encrypted paths found to request download.");
+      Logger.info("No valid encrypted paths found to request download.");
       return;
     }
 
-    console.info(`Requesting content for ${encryptedPathsToRequest.length} encrypted file paths...`);
+    Logger.info(`Requesting content for ${encryptedPathsToRequest.length} encrypted file paths...`);
 
     for (let i = 0; i < encryptedPathsToRequest.length; i += DOWNLOAD_CHUNK_FILE_COUNT) {
       const chunkPaths = encryptedPathsToRequest.slice(i, i + DOWNLOAD_CHUNK_FILE_COUNT);
-      console.info(
+      Logger.info(
         `Requesting download chunk ${Math.floor(i / DOWNLOAD_CHUNK_FILE_COUNT) + 1}: ${chunkPaths.length} paths (starting with ${chunkPaths[0].substring(0, 20)}...).`,
       );
 
@@ -516,21 +512,21 @@ export default class FastSyncPlugin extends Plugin {
         const downloadedFilesData = await FastSyncApi.downloadFilesContent(chunkPaths, apiOptions);
 
         if (downloadedFilesData.length === 0 && chunkPaths.length > 0) {
-          console.warn(`Server returned no content for requested chunk starting with ${chunkPaths[0].substring(0, 20)}.`);
+          Logger.warn(`Server returned no content for requested chunk starting with ${chunkPaths[0].substring(0, 20)}.`);
           continue;
         }
 
-        console.info(`Processing downloaded chunk of ${downloadedFilesData.length} files...`);
+        Logger.info(`Processing downloaded chunk of ${downloadedFilesData.length} files...`);
         for (const fileData of downloadedFilesData) {
           await this.saveDownloadedFile(fileData, apiOptions);
         }
       } catch (error) {
-        console.error(`Error downloading or processing chunk starting with ${chunkPaths[0].substring(0, 20)}:`, error);
+        Logger.error(`Error downloading or processing chunk starting with ${chunkPaths[0].substring(0, 20)}:`, error);
         new Notice(`Error downloading files: ${error.message}. Check logs.`, 8000);
       }
     }
 
-    console.info(`File downloads completed in ${(performance.now() - downloadStart).toFixed(2)}ms`);
+    Logger.info(`File downloads completed in ${(performance.now() - downloadStart).toFixed(2)}ms`);
   }
 
   /** Saves a single downloaded file (with encrypted path/content) to the local vault. */
@@ -549,7 +545,7 @@ export default class FastSyncPlugin extends Plugin {
         throw new Error(`Failed to determine plaintext path for encrypted path ${fileData.encryptedFilePath.substring(0, 20)}...`);
       }
 
-      console.debug(`Saving downloaded file: ${plaintextPath} (mtime: ${new Date(fileData.mtime).toISOString()})`);
+      Logger.debug(`Saving downloaded file: ${plaintextPath} (mtime: ${new Date(fileData.mtime).toISOString()})`);
       await ensureFoldersExist(this.vaultAdapter, plaintextPath);
 
       let finalContent: string | ArrayBuffer;
@@ -582,20 +578,20 @@ export default class FastSyncPlugin extends Plugin {
       this.contentHashCache.set(plaintextPath, fileData.contentHash);
     } catch (error) {
       const pathIdentifier = plaintextPath || `encrypted:${fileData.encryptedFilePath.substring(0, 20)}`;
-      console.error(`Error saving downloaded file ${pathIdentifier}:`, error);
+      Logger.error(`Error saving downloaded file ${pathIdentifier}:`, error);
       new Notice(`Failed to save downloaded file: ${pathIdentifier}. Check logs.`, 5000);
     }
   }
 
   private handleFileModify(file: TFile | null) {
     if (!(file instanceof TFile)) return;
-    console.debug(`File modified: ${file.path}, invalidating content cache.`);
+    Logger.debug(`File modified: ${file.path}, invalidating content cache.`);
     this.contentHashCache.invalidate(file.path);
   }
 
   private async handleFileDelete(file: TFile | null) {
     if (!(file instanceof TFile)) return;
-    console.info(`File deleted locally: ${file.path}, adding to deletion queue.`);
+    Logger.info(`File deleted locally: ${file.path}, adding to deletion queue.`);
     this.contentHashCache.invalidate(file.path);
     if (!this.settings.deletionQueue.includes(file.path)) {
       this.settings.deletionQueue.push(file.path);
@@ -606,7 +602,7 @@ export default class FastSyncPlugin extends Plugin {
 
   private async handleFileRename(file: TFile | null, oldPath: string) {
     if (!(file instanceof TFile)) return;
-    console.info(`File renamed: ${oldPath} -> ${file.path}`);
+    Logger.info(`File renamed: ${oldPath} -> ${file.path}`);
     this.contentHashCache.invalidate(oldPath);
     this.contentHashCache.invalidate(file.path);
     if (!this.settings.deletionQueue.includes(oldPath)) {
@@ -633,7 +629,7 @@ export default class FastSyncPlugin extends Plugin {
       return;
     }
 
-    console.warn("Starting FORCE PUSH operation!");
+    Logger.warn("Starting FORCE PUSH operation!");
     new Notice("Starting Force Push...");
     this.syncing = true;
     this.updateStatusBar("Force Pushing...");
@@ -642,24 +638,24 @@ export default class FastSyncPlugin extends Plugin {
       encryptionKey: this.encryptionKey,
     };
     try {
-      console.info("Step 1: Resetting server state...");
+      Logger.info("Step 1: Resetting server state...");
       await FastSyncApi.resetServerStateForForcePush(apiOptions);
-      console.info("Server state reset successfully.");
+      Logger.info("Server state reset successfully.");
 
-      console.info("Step 2: Clearing local deletion queue and cache...");
+      Logger.info("Step 2: Clearing local deletion queue and cache...");
       this.settings.deletionQueue = [];
       this.contentHashCache.clear();
       this.lastFullRehash = Date.now();
 
-      console.info("Step 3: Scanning all local files for push...");
+      Logger.info("Step 3: Scanning all local files for push...");
       const localFilePaths = await getAllUserFiles(this.app.vault);
       if (this.settings.syncPlugins) {
         const pluginFiles = await getPluginFiles(this.app.vault);
         localFilePaths.push(...pluginFiles);
       }
-      console.info(`Found ${localFilePaths.length} local files to force push.`);
+      Logger.info(`Found ${localFilePaths.length} local files to force push.`);
 
-      console.info("Step 4: Preparing upload entries...");
+      Logger.info("Step 4: Preparing upload entries...");
       const uploadEntries: UploadPayloadEntry[] = [];
       const maxFileSizeBytes = this.settings.maxFileSizeMB * 1024 * 1024;
       for (const localPath of localFilePaths) {
@@ -675,25 +671,25 @@ export default class FastSyncPlugin extends Plugin {
 
           uploadEntries.push(await this.prepareUploadEntry(localPath, stableId, fileData, contentHash, stat.mtime, false, apiOptions));
         } catch (error) {
-          console.error(`Error preparing file ${localPath} for force push:`, error);
+          Logger.error(`Error preparing file ${localPath} for force push:`, error);
           new Notice(`Skipping ${localPath} during force push due to error.`, 3000);
         }
       }
 
-      console.info("Step 5: Uploading all local files...");
+      Logger.info("Step 5: Uploading all local files...");
       if (uploadEntries.length > 0) {
         await this.processFileUploads(uploadEntries, apiOptions);
       } else {
-        console.warn("No valid local files found to upload during force push.");
+        Logger.warn("No valid local files found to upload during force push.");
       }
 
-      console.warn("FORCE PUSH complete.");
+      Logger.warn("FORCE PUSH complete.");
       new Notice("Force Push complete. Server state overwritten.");
       this.settings.lastSync = Date.now();
       await this.saveSettings();
       this.updateStatusBar();
     } catch (error) {
-      console.error("FORCE PUSH failed:", error);
+      Logger.error("FORCE PUSH failed:", error);
       new Notice(`Force Push failed: ${error.message}`, 10000);
       this.updateStatusBar("Sync failed!");
     } finally {
@@ -720,7 +716,7 @@ export default class FastSyncPlugin extends Plugin {
       return;
     }
 
-    console.warn("Starting FORCE PULL operation!");
+    Logger.warn("Starting FORCE PULL operation!");
     new Notice("Starting Force Pull...");
     this.syncing = true;
     this.updateStatusBar("Force Pulling...");
@@ -729,16 +725,16 @@ export default class FastSyncPlugin extends Plugin {
       encryptionKey: this.encryptionKey,
     };
     try {
-      console.info("Step 1: Clearing local deletion queue and cache...");
+      Logger.info("Step 1: Clearing local deletion queue and cache...");
       this.settings.deletionQueue = [];
       this.contentHashCache.clear();
       this.lastFullRehash = 0;
 
-      console.info("Step 2: Fetching remote state...");
+      Logger.info("Step 2: Fetching remote state...");
       const remoteState = await FastSyncApi.downloadRemoteState(apiOptions);
       const remoteStateMap = remoteState.state;
       const remoteStableIds = Object.keys(remoteStateMap);
-      console.info(`Found ${remoteStableIds.length} stable IDs in remote state.`);
+      Logger.info(`Found ${remoteStableIds.length} stable IDs in remote state.`);
 
       const stableIdsToDownload: StableFileId[] = [];
       const remoteFilesMap = new Map<StableFileId, { meta: VaultFileState; plaintextPath: string | null }>();
@@ -759,20 +755,20 @@ export default class FastSyncPlugin extends Plugin {
 
           const isPluginFile = plaintextPath.startsWith(this.app.vault.configDir + "/plugins/");
           if (!this.settings.syncPlugins && isPluginFile) {
-            console.debug(`Force Pull: Skipping plugin file ${plaintextPath}`);
+            Logger.debug(`Force Pull: Skipping plugin file ${plaintextPath}`);
             continue;
           }
           stableIdsToDownload.push(stableId);
         } catch (e) {
-          console.error(
+          Logger.error(
             `Force Pull: Failed to decrypt path for stableId ${stableId.substring(0, 10)}... Skipping download. Error: ${e.message}`,
           );
           new Notice(`Failed to decrypt path for a remote file. Skipping download. Check logs/password.`);
         }
       }
-      console.info(`Identified ${stableIdsToDownload.length} files to potentially download.`);
+      Logger.info(`Identified ${stableIdsToDownload.length} files to potentially download.`);
 
-      console.info("Step 4: Scanning local files for deletion comparison...");
+      Logger.info("Step 4: Scanning local files for deletion comparison...");
       const localFilePaths = await getAllUserFiles(this.app.vault);
       if (this.settings.syncPlugins) {
         const pluginFiles = await getPluginFiles(this.app.vault);
@@ -788,22 +784,22 @@ export default class FastSyncPlugin extends Plugin {
             localFilesToDelete.push(localPath);
           }
         } catch (hashError) {
-          console.error(`Failed to hash local path ${localPath} during force pull deletion check: ${hashError}`);
+          Logger.error(`Failed to hash local path ${localPath} during force pull deletion check: ${hashError}`);
         }
       }
-      console.info(`Identified ${localFilesToDelete.length} local files for deletion.`);
+      Logger.info(`Identified ${localFilesToDelete.length} local files for deletion.`);
 
-      console.info("Step 5: Deleting local files not present or deleted on server...");
+      Logger.info("Step 5: Deleting local files not present or deleted on server...");
       let deletionErrors = 0;
       for (const filePath of localFilesToDelete) {
         try {
           if (await this.vaultAdapter.exists(filePath)) {
-            console.debug(`Deleting local file: ${filePath}`);
+            Logger.debug(`Deleting local file: ${filePath}`);
             await this.vaultAdapter.remove(filePath);
           }
           this.contentHashCache.invalidate(filePath);
         } catch (error) {
-          console.error(`Failed to delete local file ${filePath}:`, error);
+          Logger.error(`Failed to delete local file ${filePath}:`, error);
           deletionErrors++;
         }
       }
@@ -812,20 +808,20 @@ export default class FastSyncPlugin extends Plugin {
       }
       await this.runCleanEmptyFolders();
 
-      console.info("Step 6: Downloading files from server...");
+      Logger.info("Step 6: Downloading files from server...");
       if (stableIdsToDownload.length > 0) {
         await this.processFileDownloads(stableIdsToDownload, apiOptions);
       } else {
-        console.info("No files to download from server.");
+        Logger.info("No files to download from server.");
       }
 
-      console.warn("FORCE PULL complete.");
+      Logger.warn("FORCE PULL complete.");
       new Notice("Force Pull complete. Local state overwritten.");
       this.settings.lastSync = Date.now();
       await this.saveSettings();
       this.updateStatusBar();
     } catch (error) {
-      console.error("FORCE PULL failed:", error);
+      Logger.error("FORCE PULL failed:", error);
       new Notice(`Force Pull failed: ${error.message}`, 10000);
       this.updateStatusBar("Sync failed!");
     } finally {
@@ -840,7 +836,7 @@ export default class FastSyncPlugin extends Plugin {
     /* ... */ try {
       await cleanEmptyFolders(this.vaultAdapter, "/");
     } catch (error) {
-      console.error("Error during empty folder cleanup:", error);
+      Logger.error("Error during empty folder cleanup:", error);
     }
   }
 
@@ -891,11 +887,11 @@ export default class FastSyncPlugin extends Plugin {
 
     try {
       const stableId = await hashStringSHA256(plaintextPath);
-      console.debug(`Opening history for path: ${plaintextPath}, stableId: ${stableId.substring(0, 10)}...`);
+      Logger.debug(`Opening history for path: ${plaintextPath}, stableId: ${stableId.substring(0, 10)}...`);
 
       new FileVersionsModal(this.app, this, stableId, plaintextPath).open();
     } catch (error) {
-      console.error(`Could not calculate stableId for ${plaintextPath}:`, error);
+      Logger.error(`Could not calculate stableId for ${plaintextPath}:`, error);
       new Notice(`Could not open history for ${plaintextPath}.`);
     }
   }
@@ -925,7 +921,7 @@ export default class FastSyncPlugin extends Plugin {
       try {
         return await decryptText(encryptedPath, this.encryptionKey);
       } catch (e) {
-        console.warn(`Failed to decrypt path ${encryptedPath.substring(0, 20)}... : ${e.message}`);
+        Logger.warn(`Failed to decrypt path ${encryptedPath.substring(0, 20)}... : ${e.message}`);
         return null;
       }
     }
@@ -934,21 +930,21 @@ export default class FastSyncPlugin extends Plugin {
 
   /** Handles changes to the encryption password from the settings tab */
   async handleEncryptionPasswordChange(oldPassword: string | null, newPassword: string): Promise<void> {
-    console.info("Encryption password setting changed.");
+    Logger.info("Encryption password setting changed.");
     this.encryptionKey = null;
     if (newPassword) {
-      console.info("Attempting to derive new encryption key...");
+      Logger.info("Attempting to derive new encryption key...");
       try {
         this.encryptionKey = await deriveEncryptionKey(newPassword);
-        console.info("New encryption key derived successfully.");
+        Logger.info("New encryption key derived successfully.");
         new Notice("Encryption key updated. A Force Push/Pull may be required.", 15000);
       } catch (error) {
-        console.error("Failed to derive new encryption key:", error);
+        Logger.error("Failed to derive new encryption key:", error);
         this.encryptionKey = null;
         throw new Error(`Failed to initialize encryption with new password: ${error.message}`);
       }
     } else {
-      console.info("Encryption disabled.");
+      Logger.info("Encryption disabled.");
       new Notice("Encryption disabled. A Force Push/Pull may be required.", 15000);
     }
     this.contentHashCache.clear();

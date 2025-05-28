@@ -20,13 +20,13 @@ export class LogViewerModal extends Modal {
   onOpen() {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.createEl("h2", { text: "Fast Sync Log" });
+    contentEl.createEl("h2", { text: "FastSync log" });
 
     const controlsContainer = contentEl.createDiv("fast-sync-log-controls");
     const buttonContainer = controlsContainer.createDiv("button-container");
 
     new ButtonComponent(buttonContainer)
-      .setButtonText("Clear Logs")
+      .setButtonText("Clear logs")
       .setTooltip("Clear all currently displayed logs")
       .onClick(() => {
         this.logStore.clear();
@@ -34,7 +34,7 @@ export class LogViewerModal extends Modal {
       });
 
     this.autoScrollButton = new ButtonComponent(buttonContainer)
-      .setButtonText("Auto-Scroll")
+      .setButtonText("Auto-scroll")
       .setTooltip("Toggle automatic scrolling to the latest log entry")
       .setClass("auto-scroll-toggle")
       .onClick(() => {

@@ -1,4 +1,5 @@
 import { ENCRYPTION_VALIDATION_IV, ENCRYPTION_VALIDATION_PAYLOAD } from "./constants";
+import { Logger } from "./utils/logging";
 
 export type DerivedKey = CryptoKey | null;
 
@@ -31,7 +32,7 @@ export async function deriveEncryptionKey(password: string): Promise<DerivedKey>
       ["encrypt", "decrypt"],
     );
   } catch (error) {
-    console.error("Failed to derive encryption key:", error);
+    Logger.error("Failed to derive encryption key:", error);
 
     throw new Error("Failed to initialize encryption. Check password or browser support.");
   }
@@ -64,7 +65,7 @@ export async function encryptText(text: string, encryptionKey: DerivedKey): Prom
         .join(""),
     );
   } catch (error) {
-    console.error("Encryption failed:", error);
+    Logger.error("Encryption failed:", error);
     throw new Error("Failed to encrypt data.");
   }
 }
@@ -91,7 +92,7 @@ export async function decryptText(base64Ciphertext: string, encryptionKey: Deriv
 
     return new TextDecoder().decode(decrypted);
   } catch (error) {
-    console.error("Decryption failed:", error);
+    Logger.error("Decryption failed:", error);
 
     if (error instanceof DOMException && error.name === "OperationError") {
       throw new Error("Decryption failed. Key mismatch or data corrupted?");
@@ -120,7 +121,7 @@ export async function encryptValidationPayload(encryptionKey: DerivedKey): Promi
         .join(""),
     );
   } catch (error) {
-    console.error("Failed to encrypt validation payload:", error);
+    Logger.error("Failed to encrypt validation payload:", error);
     throw new Error("Could not prepare encryption validation.");
   }
 }
@@ -136,7 +137,7 @@ export async function verifyEncryptionValidationPayload(
 ): Promise<boolean> {
   if (!encryptionKey) throw new Error("Decryption key not available for validation.");
   if (!encryptedPayload) {
-    console.error("Server did not provide encryption validation marker, but client expects encryption.");
+    Logger.error("Server did not provide encryption validation marker, but client expects encryption.");
     throw new Error(
       "Encryption Mismatch: Server state appears unencrypted or uses an older format. Please Force Push to encrypt or disable client encryption.",
     );
@@ -150,16 +151,16 @@ export async function verifyEncryptionValidationPayload(
     const decryptedValidation = new TextDecoder().decode(decrypted);
 
     if (decryptedValidation !== ENCRYPTION_VALIDATION_PAYLOAD) {
-      console.error("Decrypted validation payload mismatch!", {
+      Logger.error("Decrypted validation payload mismatch!", {
         expected: ENCRYPTION_VALIDATION_PAYLOAD,
         got: decryptedValidation,
       });
       throw new Error("Encryption Key Mismatch! Please verify your password.");
     }
-    console.info("Encryption validation successful.");
+    Logger.info("Encryption validation successful.");
     return true;
   } catch (error) {
-    console.error("Failed to decrypt or validate server encryption marker:", error);
+    Logger.error("Failed to decrypt or validate server encryption marker:", error);
 
     if (error instanceof Error && error.message.includes("Encryption Key Mismatch")) {
       throw error;

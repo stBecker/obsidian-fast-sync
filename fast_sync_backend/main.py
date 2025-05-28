@@ -9,13 +9,13 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY
 
-from fast_sync_backend.config import DB_BASE_PATH, API_KEY
-from fast_sync_backend.models import HealthResponse
-from fast_sync_backend.routers.sync import router as sync_router
+from config import DB_BASE_PATH, API_KEY
+from models import HealthResponse
+from routers.sync import router as sync_router
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Fast Sync Server")
+app = FastAPI(title="FastSync Server")
 
 
 class CompressionLoggingMiddleware:
@@ -87,8 +87,8 @@ def read_health():
 
 if __name__ == "__main__":
     os.makedirs(DB_BASE_PATH, exist_ok=True)
-    logger.info(f"Starting Fast Sync Server...")
+    logger.info(f"Starting FastSync Server...")
     logger.info(f"Using database base path: {os.path.abspath(DB_BASE_PATH)}")
     logger.info(f"API Key Loaded: {'Yes' if API_KEY else 'No'}")
 
-    uvicorn.run("fast_sync_backend.main:app", host="0.0.0.0", port=32400, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=32400, reload=True)
